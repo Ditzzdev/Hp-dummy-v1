@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HP Simulasi - Kalkulator & Telepon</title>
+<style>
+html, body { margin:0; padding:0; height:100%; background:white; display:flex; justify-content:center; align-items:center; overflow:hidden; }
+.phone { width:200px; height:380px; background:#000; border-radius:20px; padding:5px; display:flex; justify-content:center; align-items:center; position:relative; }
+.screen { width:100%; height:100%; border-radius:20px; background:url("wallpaper.jpg") no-repeat center center; background-size:cover; position:relative; overflow:hidden; }
+.punch-hole { width:14px; height:14px; background:black; border-radius:50%; position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:3; box-shadow: inset 0 0 3px rgba(255,255,255,0.3);}
+.app-grid { margin-top:20px; width:100%; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(5,1fr); gap:10px; padding:15px; box-sizing:border-box; position:relative; z-index:1;}
+.app { display:flex; justify-content:center; align-items:center; cursor:pointer; }
+.app div { width:35px; height:35px; border-radius:8px; }
+.app.red div{background:red;} .app.blue div{background:blue;} .app.green div{background:green;} .app.orange div{background:orange;}
+.app.empty div{background:transparent; cursor:default;}
+.nav-bar { width:60px; height:5px; background:gray; border-radius:3px; position:absolute; bottom:0; left:50%; transform:translateX(-50%); opacity:0.7; cursor:pointer; z-index:3;}
+.app-open { position:absolute; top:0; left:0; width:100%; height:100%; background:white; border-radius:20px; transform:scale(0); opacity:0; transition: transform .4s ease, opacity .4s ease; z-index:2; overflow:auto; display:flex; flex-direction:column; padding:10px; box-sizing:border-box;}
+.app-open.active { transform:scale(1); opacity:1; }
+
+/* Galeri */
+.gallery-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:5px; }
+.gallery-grid img { width:100%; border-radius:8px; cursor:pointer; transition: transform .3s ease; }
+.gallery-fullscreen { width:100%; height:100%; object-fit:contain; border-radius:8px; }
+
+/* Kalkulator */
+.calc-view {
+  width:90%;
+  height:auto;
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  background:#f9f9f9;
+  border-radius:10px;
+  padding:5px;
+}
+#calcDisplay { width:100%; height:35px; margin-bottom:5px; font-size:16px; text-align:right; border-radius:5px; border:1px solid #ccc; padding:5px; box-sizing:border-box; }
+.calc-buttons { display:grid; grid-template-columns:repeat(4,1fr); grid-gap:5px; }
+.calc-btn { font-size:14px; padding:8px; border:none; border-radius:5px; cursor:pointer; transition:all .1s; }
+.calc-btn.number { background:#ddd; }
+.calc-btn.operator { background:#ff9500; color:white; }
+.calc-btn:hover { filter:brightness(0.9); transform:scale(0.97); }
+
+/* Telepon */
+.phone-view { 
+  display:flex; 
+  flex-direction:column; 
+  align-items:center; 
+  justify-content: center; /* naikkan semua isi ke tengah */
+  width:100%; 
+  padding:5px; 
+  border-radius:10px; 
+  height:100%; 
+  box-sizing:border-box;
+  gap:5px; /* jarak antar elemen */
+}
+#phoneDisplay { font-size:18px; text-align:center; margin-bottom:5px; min-height:25px; }
+.keypad { 
+  display:grid; 
+  grid-template-columns:repeat(3,1fr); 
+  grid-gap:5px; 
+  justify-items:center; 
+  align-items:center; 
+}
+.keypad-btn { 
+  width:40px; 
+  height:40px; 
+  border-radius:50%; 
+  border:none; 
+  background:#ddd; 
+  font-size:16px; 
+  cursor:pointer; 
+  display:flex; 
+  justify-content:center; 
+  align-items:center; 
+  transition:all .1s; 
+}
+.keypad-btn:hover { filter:brightness(0.9); transform:scale(0.97); }
+.call-btn { background:green; color:white; }
+.delete-btn { background:red; color:white; }
+.call-status { text-align:center; margin-top:5px; font-size:12px; }
+
+/* Coming */
+.coming-view { display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="screen">
+    <div class="punch-hole"></div>
+    <div class="app-grid" id="appGrid">
+      <div class="app red" data-app="calculator"><div></div></div>
+      <div class="app blue" data-app="gallery"><div></div></div>
+      <div class="app green" data-app="phone"><div></div></div>
+      <div class="app orange" data-app="coming"><div></div></div>
+      <div class="app empty"><div></div></div><div class="app empty"><div></div></div>
+      <div class="app empty"><div></div></div><div class="app empty"><div></div></div>
+    </div>
+    <div class="app-open" id="appOpen"></div>
+    <div class="nav-bar" id="navBar"></div>
+  </div>
+</div>
+
+<script>
+const apps = document.querySelectorAll(".app");
+const appOpen = document.getElementById("appOpen");
+const navBar = document.getElementById("navBar");
+
+// Foto di folder
+const galleryPhotos = ["foto1.jpg","foto2.jpg","foto3.jpg","foto4.jpg"];
+
+function openApp(type){
+  appOpen.innerHTML = "";
+  let content = "";
+
+  if(type==="calculator"){
+    const btns = ["7","8","9","/","4","5","6","*","1","2","3","-","0",".","=","C","+"];
+    content = `
+      <div class="calc-view">
+        <input type="text" id="calcDisplay" readonly>
+        <div class="calc-buttons">
+          ${btns.map(b=>`<button class="calc-btn ${isNaN(b)&&b!=="."?"operator":"number"}">${b}</button>`).join("")}
+        </div>
+      </div>
+    `;
+    appOpen.innerHTML = content;
+    const display = appOpen.querySelector("#calcDisplay");
+    const buttons = appOpen.querySelectorAll(".calc-btn");
+    buttons.forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const val = btn.textContent;
+        if(val==="="){
+          try { display.value = eval(display.value); } 
+          catch(e){ display.value="Error"; }
+        } else if(val==="C"){
+          display.value = display.value.slice(0,-1);
+        } else {
+          display.value += val;
+        }
+      });
+    });
+
+  } else if(type==="gallery"){
+    if(galleryPhotos.length===0){
+      content = `<div><p>Belum ada foto.</p></div>`;
+    } else {
+      content = `<div class="gallery-grid">` + galleryPhotos.map(src=>`<img src="${src}" alt="Foto">`).join("") + `</div>`;
+    }
+    appOpen.innerHTML = content;
+    const imgs = appOpen.querySelectorAll("img");
+    imgs.forEach(img=>{
+      img.addEventListener("click", ()=>{
+        const full = document.createElement("img");
+        full.src = img.src;
+        full.className = "gallery-fullscreen";
+        appOpen.innerHTML = "";
+        appOpen.appendChild(full);
+      });
+    });
+
+  } else if(type==="phone"){
+    content = `
+      <div class="phone-view">
+        <div id="phoneDisplay"></div>
+        <div class="keypad">
+          ${["1","2","3","4","5","6","7","8","9","*","0","#"].map(n=>`<button class="keypad-btn">${n}</button>`).join("")}
+          <button class="keypad-btn delete-btn">⌫</button>
+          <button class="keypad-btn call-btn">Call</button>
+        </div>
+        <div id="callStatus" class="call-status"></div>
+      </div>
+    `;
+    appOpen.innerHTML = content;
+    const display = appOpen.querySelector("#phoneDisplay");
+    appOpen.querySelectorAll(".keypad-btn").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const val = btn.textContent;
+        if(val==="Call"){
+          const status = appOpen.querySelector("#callStatus");
+          status.textContent = display.textContent ? "Memanggil " + display.textContent + "..." : "Masukkan nomor dulu!";
+        } else if(val==="⌫"){
+          display.textContent = display.textContent.slice(0,-1);
+        } else {
+          display.textContent += val;
+        }
+      });
+    });
+
+  } else if(type==="coming"){
+    content = `<div class="coming-view"><h3>Coming Soon…</h3></div>`;
+    appOpen.innerHTML = content;
+  }
+
+  appOpen.classList.add("active");
+}
+
+apps.forEach(app=>{
+  app.addEventListener("click",()=>{
+    const type = app.dataset.app;
+    if(type) openApp(type);
+  });
+});
+
+navBar.addEventListener("click",()=>{
+  appOpen.classList.remove("active");
+  appOpen.innerHTML="";
+});
+</script>
+</body>
+</html>
